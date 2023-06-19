@@ -12,6 +12,11 @@
             "name": "Tobias Blum",
             "email": "dev@tobiasblum.de",
             "url": "https://github.com/toblum",
+            "maintainer": false
+        },
+        {
+            "name": "charmesal",
+            "url": "https://github.com/charmesal",
             "maintainer": true
         }
     ],
