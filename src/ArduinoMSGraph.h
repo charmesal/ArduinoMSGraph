@@ -90,6 +90,7 @@ public:
 
 	// Graph Data Methods
 	GraphPresence getUserPresence();
+	std::vector<GraphEvent> getEventsForSpecificUser(const char *user, const char *startDateTime,  const char *endDateTime, const char *timezone = "Europe/Berlin", int count = 5);
 	std::vector<GraphEvent> getUserEvents(int count = 3, const char *timezone = "Europe/Berlin");
 
 private:

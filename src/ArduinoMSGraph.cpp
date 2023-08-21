@@ -61,7 +61,7 @@ bool ArduinoMSGraph::requestJsonApi(JsonDocument& responseDoc, const char *url, 
     if (https.begin(url, cert)) {
 		https.setConnectTimeout(10000);
 		https.setTimeout(10000);
-		https.useHTTP10(true);
+		//https.useHTTP10(true);
 
 		// Send auth header?
 		if (sendAuth) {
@@ -88,7 +88,7 @@ bool ArduinoMSGraph::requestJsonApi(JsonDocument& responseDoc, const char *url, 
 
 			// File found at server (HTTP 200, 301), or HTTP 400, 401 with response payload
 			if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY || httpCode == HTTP_CODE_BAD_REQUEST || httpCode == HTTP_CODE_UNAUTHORIZED) {
-				String payload = https.getString(); 
+				String payload = https.getString();
 				payload.replace("'", ""); // Delete single quotes
 				// if (strstr(url, "events") != NULL) {
 				// 	DBG_PRINTLN(payload);
@@ -408,6 +408,62 @@ std::vector<GraphEvent> ArduinoMSGraph::getUserEvents(int count, const char *tim
 
 	bool res = requestJsonApi(responseDoc, url, "", "GET", true, extraHeader);
 	// serializeJsonPretty(responseDoc, Serial);
+
+	if (!res) {
+		resultError.hasError = true;
+		resultError.message = strdup("Request error");
+	} else if (responseDoc.containsKey("error")) {
+		_handleApiError(responseDoc, resultError);
+	} else {
+		// Return event info
+		if (responseDoc.containsKey("value")) {
+			JsonArray items = responseDoc["value"];
+
+			for (JsonObject item : items) {
+				GraphEvent event;
+				event.id = (char *)item["id"].as<char *>();
+				event.subject = (char *)item["subject"].as<char *>();
+				event.locationTitle = (char *)item["location"]["displayName"].as<char *>();
+				event.bodyPreview = (char *)item["bodyPreview"].as<char *>();
+				event.startDate.dateTime = (char *)item["start"]["dateTime"].as<char *>();
+				event.startDate.timeZone = (char *)item["start"]["timeZone"].as<char *>();
+				event.endDate.dateTime = (char *)item["end"]["dateTime"].as<char *>();
+				event.endDate.timeZone = (char *)item["end"]["timeZone"].as<char *>();
+
+				result.push_back(event);
+			}
+		}
+	}
+
+	this->_lastError = resultError;
+	return result;
+}
+
+/**
+ * Get {count} next events in calendar from {user}.
+ * @param user the e-mail address of the user.
+ * @param startDateTime DateTime value from where to start looking. Format: "yyyy-mm-ddThh:mm:ss".
+ * @param endDateTime DateTime value from where to stop looking. Format: "yyyy-mm-ddThh:mm:ss".
+ * @param timezone Timezone in which the times should be returned. Default = "Europe/Berlin"
+ * @param count Number of events of request. Default = 5
+ * 
+ * @returns Vector of GraphEvent structures to hold the result.
+ */
+std::vector<GraphEvent> ArduinoMSGraph::getEventsForSpecificUser(const char *user, const char *startDateTime,  const char *endDateTime, const char *timezone, int count)
+{
+	GraphError resultError;
+	std::vector<GraphEvent> result;
+
+	const size_t capacity = 10000;
+	DynamicJsonDocument responseDoc(capacity);
+	char url[300];
+    sprintf(url, "https://graph.microsoft.com/v1.0/users/%s/calendar/calendarView?startDateTime=%s&endDateTime=%s&$select=start,end,subject,organizer&$top=%d", user, startDateTime, endDateTime, count);
+	char timezoneParam[129];
+	sprintf(timezoneParam, "outlook.timezone=\"%s\"", timezone);
+	GraphRequestHeader extraHeader = { "Prefer", timezoneParam };
+
+	bool res = requestJsonApi(responseDoc, url, "", "GET", true, extraHeader);
+	serializeJsonPretty(responseDoc, Serial);
 
 	if (!res) {
 		resultError.hasError = true;
